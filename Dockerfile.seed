@@ -1,0 +1,8 @@
+# Lightweight image used to seed the admin user once the DB is up.
+FROM node:20-alpine
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci --omit=optional
+COPY tsconfig.json ./
+COPY src/db ./src/db
+CMD ["npx", "tsx", "src/db/seed.ts"]

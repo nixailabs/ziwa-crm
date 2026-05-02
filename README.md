@@ -54,6 +54,62 @@ Stack: **Next.js 15 (App Router) · TypeScript · ShadCN UI · PostgreSQL · Dri
    - Email: `shady@ziwaland.com`
    - Password: `PasswordDefault@Ziwa`
 
+## Docker / production deploy
+
+The repo ships with a multi-stage `Dockerfile` (Next.js standalone output) and a
+`docker-compose.yml` that brings up Postgres + the app + a one-shot seeder.
+
+### Run anywhere with Docker
+
+```bash
+cp .env.example .env   # then edit values
+docker compose build
+docker compose up -d
+# seed the admin user (idempotent)
+docker compose run --rm seed
+# app will be on http://localhost
+```
+
+Required env vars (see `docker-compose.yml`):
+
+- `POSTGRES_PASSWORD` — Postgres password used by both the DB and the app.
+- `JWT_SECRET` — long random string for session signing.
+- `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` — optional, enables the interactive
+  Google Maps geofencing editor. Manual lat/lng entry works without it.
+
+### One-shot deploy to a fresh Linux server
+
+From your laptop (with `ssh` + `rsync` installed), point at the box and run:
+
+```bash
+SERVER_IP=176.58.124.214 SERVER_USER=root ./scripts/deploy.sh
+```
+
+The script will:
+
+1. Install Docker + the compose plugin (idempotent).
+2. Rsync the project to `/opt/ziwa-crm`.
+3. Generate `.env` with random secrets if one doesn't exist yet.
+4. `docker compose build && up -d` and run the seeder.
+5. Print the URL and the seeded login.
+
+### Adding a long-lived SSH key (for Claude / CI)
+
+Generate a dedicated keypair on your machine, then push the public half:
+
+```bash
+ssh-keygen -t ed25519 -f ~/.ssh/ziwa_claude -C "claude@ziwa"
+SERVER_IP=176.58.124.214 SERVER_USER=root \
+  ./scripts/install-claude-key.sh ~/.ssh/ziwa_claude.pub
+```
+
+After that, `ssh -i ~/.ssh/ziwa_claude root@176.58.124.214` works without a
+password. Hand the *private* key to whatever automation needs persistent
+access — never paste it into chat.
+
+> Security note: rotate the root password and the seeded admin password as
+> soon as the deploy succeeds, since both were transmitted in plaintext.
+
 ## Project structure
 
 ```

@@ -1,0 +1,53 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: ziwa-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ziwa_crm
+      POSTGRES_USER: ziwa
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ziwa_change_me}
+    volumes:
+      - ziwa_pg_data:/var/lib/postgresql/data
+      - ./src/db/bootstrap.sql:/docker-entrypoint-initdb.d/01_bootstrap.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ziwa -d ziwa_crm"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "127.0.0.1:5432:5432"
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: ${NEXT_PUBLIC_GOOGLE_MAPS_API_KEY:-}
+    container_name: ziwa-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://ziwa:${POSTGRES_PASSWORD:-ziwa_change_me}@db:5432/ziwa_crm
+      JWT_SECRET: ${JWT_SECRET:-please-change-me}
+      NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: ${NEXT_PUBLIC_GOOGLE_MAPS_API_KEY:-}
+      NODE_ENV: production
+    ports:
+      - "80:3000"
+
+  seed:
+    build:
+      context: .
+      dockerfile: Dockerfile.seed
+    container_name: ziwa-seed
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://ziwa:${POSTGRES_PASSWORD:-ziwa_change_me}@db:5432/ziwa_crm
+    restart: "no"
+
+volumes:
+  ziwa_pg_data:
